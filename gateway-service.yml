@@ -2,19 +2,65 @@ server:
   port: 8080
 
 spring:
-  application:
-    name: gateway-service
   cloud:
     gateway:
+      # Activation de la découverte automatique (optionnel, mais utile)
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      
+      # Configuration CORS globale (Alternative au Bean Java)
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: 
+              - "http://localhost:4200"
+              - "http://localhost:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+
+      # --- DÉFINITION DES ROUTES ---
       routes:
+        # 1. USER SERVICE
         - id: user-service
-     
           uri: lb://user-service
           predicates:
-            
             - Path=/users/**, /auth/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: userServiceCB
+                fallbackUri: forward:/fallback/user
+
+        # 2. INSCRIPTION SERVICE
+        # Gère les inscriptions, les campagnes et les documents
         - id: inscription-service
-          
           uri: lb://inscription-service
           predicates:
-            - Path=/inscriptions/**
+            - Path=/inscriptions/**, /campagnes/**, /documents/**
+
+        # 3. SOUTENANCE SERVICE
+        - id: soutenance-service
+          uri: lb://soutenance-service
+          predicates:
+            - Path=/soutenances/**
+
+        # 4. NOTIFICATION SERVICE/
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**, /api/test/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
